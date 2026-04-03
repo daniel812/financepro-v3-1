@@ -11,7 +11,8 @@ import {
   defaultDropAnimationSideEffects,
   DragStartEvent,
   DragOverEvent,
-  DragEndEvent
+  DragEndEvent,
+  useDroppable
 } from '@dnd-kit/core';
 import { 
   arrayMove, 
@@ -39,6 +40,31 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
   { id: 'DOING', label: 'Haciendo', color: 'bg-indigo-500' },
   { id: 'DONE', label: 'Hecho', color: 'bg-emerald-500' },
 ];
+
+const DroppableColumn = ({ id, children, column, onAdd, taskCount }: { id: TaskStatus; children: React.ReactNode; column: any; onAdd: () => void; taskCount: number }) => {
+  const { setNodeRef } = useDroppable({ id });
+
+  return (
+    <div ref={setNodeRef} className="flex-1 flex flex-col min-w-[300px] bg-slate-100/50 rounded-[2rem] p-4 border border-slate-200/50">
+      <div className="flex items-center justify-between mb-4 px-2">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${column.color}`}></div>
+          <h3 className="font-black text-slate-700 uppercase tracking-widest text-xs">{column.label}</h3>
+          <span className="bg-white text-slate-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200">
+            {taskCount}
+          </span>
+        </div>
+        <button 
+          onClick={onAdd}
+          className="w-8 h-8 flex items-center justify-center bg-white text-slate-400 hover:text-indigo-600 hover:shadow-md rounded-xl transition-all"
+        >
+          <Plus size={18} />
+        </button>
+      </div>
+      {children}
+    </div>
+  );
+};
 
 const SortableTaskCard = ({ task, onDelete, onClick }: { task: Task; onDelete: (id: string) => void; onClick: (task: Task) => void }) => {
   const {
@@ -198,30 +224,26 @@ const Notes: React.FC<NotesProps> = ({ month, userId, familyAdminId }) => {
     const activeTask = tasks.find(t => t.id === activeId);
     if (!activeTask) return;
 
-    const isOverAColumn = COLUMNS.some(c => c.id === overId);
-    
-    if (isOverAColumn) {
-      const overColumnId = overId as TaskStatus;
-      if (activeTask.status !== overColumnId) {
-        setTasks(prev => {
-          const activeIndex = prev.findIndex(t => t.id === activeId);
-          const newTasks = [...prev];
-          newTasks[activeIndex] = { ...activeTask, status: overColumnId };
-          return newTasks;
-        });
+    // Find container of the 'over' element
+    const overContainer = COLUMNS.some(c => c.id === overId) 
+      ? overId as TaskStatus 
+      : tasks.find(t => t.id === overId)?.status;
+
+    if (!overContainer || activeTask.status === overContainer) return;
+
+    setTasks(prev => {
+      const activeIndex = prev.findIndex(t => t.id === activeId);
+      const newTasks = [...prev];
+      newTasks[activeIndex] = { ...activeTask, status: overContainer };
+      
+      // If over an item, move it to that position
+      const overIndex = prev.findIndex(t => t.id === overId);
+      if (overIndex !== -1) {
+        return arrayMove(newTasks, activeIndex, overIndex);
       }
-    } else {
-      const overTask = tasks.find(t => t.id === overId);
-      if (overTask && activeTask.status !== overTask.status) {
-        setTasks(prev => {
-          const activeIndex = prev.findIndex(t => t.id === activeId);
-          const overIndex = prev.findIndex(t => t.id === overId);
-          const newTasks = [...prev];
-          newTasks[activeIndex] = { ...activeTask, status: overTask.status };
-          return arrayMove(newTasks, activeIndex, overIndex);
-        });
-      }
-    }
+      
+      return newTasks;
+    });
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -236,51 +258,47 @@ const Notes: React.FC<NotesProps> = ({ month, userId, familyAdminId }) => {
     const activeTask = tasks.find(t => t.id === activeId);
     if (!activeTask) return;
 
+    const overContainer = COLUMNS.some(c => c.id === overId) 
+      ? overId as TaskStatus 
+      : tasks.find(t => t.id === overId)?.status;
+
+    if (!overContainer) return;
+
     let newTasks = [...tasks];
-    const isOverAColumn = COLUMNS.some(c => c.id === overId);
+    const columnTasks = newTasks.filter(t => t.status === overContainer);
+    const activeIdxInColumn = columnTasks.findIndex(t => t.id === activeId);
+    const overIdxInColumn = columnTasks.findIndex(t => t.id === overId);
 
-    if (isOverAColumn) {
-      const status = overId as TaskStatus;
-      const columnTasks = newTasks.filter(t => t.status === status && t.id !== activeId);
+    let newPos;
+    if (overIdxInColumn === -1) {
+      // Dropped on empty column
       const maxPos = columnTasks.reduce((max, t) => Math.max(max, t.position), 0);
-      newTasks = newTasks.map(t => t.id === activeId ? { ...t, status, position: maxPos + 1000 } : t);
-    } else {
-      const overTask = newTasks.find(t => t.id === overId);
-      if (!overTask) return;
-
-      const status = overTask.status;
-      const columnTasks = newTasks.filter(t => t.status === status);
-      const activeIdx = columnTasks.findIndex(t => t.id === activeId);
-      const overIdx = columnTasks.findIndex(t => t.id === overId);
-
-      if (activeIdx !== overIdx) {
-        let newPos;
-        if (overIdx === 0) {
-          newPos = columnTasks[0].position / 2;
-        } else if (overIdx === columnTasks.length - 1) {
-          newPos = columnTasks[columnTasks.length - 1].position + 1000;
-        } else {
-          const prevPos = columnTasks[overIdx - 1].position;
-          const nextPos = columnTasks[overIdx].position;
-          newPos = (prevPos + nextPos) / 2;
-        }
-        newTasks = newTasks.map(t => t.id === activeId ? { ...t, status, position: newPos } : t);
+      newPos = maxPos + 1000;
+    } else if (activeIdxInColumn !== overIdxInColumn) {
+      if (overIdxInColumn === 0) {
+        newPos = columnTasks[0].position / 2;
+      } else if (overIdxInColumn === columnTasks.length - 1) {
+        newPos = columnTasks[columnTasks.length - 1].position + 1000;
+      } else {
+        const prevPos = columnTasks[overIdxInColumn - 1].position;
+        const nextPos = columnTasks[overIdxInColumn].position;
+        newPos = (prevPos + nextPos) / 2;
       }
+    } else {
+      newPos = activeTask.position;
     }
 
+    newTasks = newTasks.map(t => t.id === activeId ? { ...t, status: overContainer, position: newPos } : t);
     setTasks(newTasks);
     
-    const updatedTask = newTasks.find(t => t.id === activeId);
-    if (updatedTask) {
-      try {
-        await dbService.updateTask(activeId, { 
-          status: updatedTask.status, 
-          position: updatedTask.position 
-        });
-      } catch (error) {
-        console.error("Error persistiendo cambio de tarea:", error);
-        loadTasks();
-      }
+    try {
+      await dbService.updateTask(activeId, { 
+        status: overContainer, 
+        position: newPos 
+      });
+    } catch (error) {
+      console.error("Error persistiendo cambio de tarea:", error);
+      loadTasks();
     }
   };
 
@@ -312,23 +330,13 @@ const Notes: React.FC<NotesProps> = ({ month, userId, familyAdminId }) => {
             onDragEnd={handleDragEnd}
           >
             {COLUMNS.map((column) => (
-              <div key={column.id} className="flex-1 flex flex-col min-w-[300px] bg-slate-100/50 rounded-[2rem] p-4 border border-slate-200/50">
-                <div className="flex items-center justify-between mb-4 px-2">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${column.color}`}></div>
-                    <h3 className="font-black text-slate-700 uppercase tracking-widest text-xs">{column.label}</h3>
-                    <span className="bg-white text-slate-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200">
-                      {tasks.filter(t => t.status === column.id).length}
-                    </span>
-                  </div>
-                  <button 
-                    onClick={() => setIsAdding(column.id)}
-                    className="w-8 h-8 flex items-center justify-center bg-white text-slate-400 hover:text-indigo-600 hover:shadow-md rounded-xl transition-all"
-                  >
-                    <Plus size={18} />
-                  </button>
-                </div>
-
+              <DroppableColumn 
+                key={column.id} 
+                id={column.id} 
+                column={column} 
+                onAdd={() => setIsAdding(column.id)}
+                taskCount={tasks.filter(t => t.status === column.id).length}
+              >
                 <div className="flex-1 overflow-y-auto no-scrollbar px-1">
                   <SortableContext
                     id={column.id}
@@ -404,7 +412,7 @@ const Notes: React.FC<NotesProps> = ({ month, userId, familyAdminId }) => {
                     )}
                   </SortableContext>
                 </div>
-              </div>
+              </DroppableColumn>
             ))}
 
             <DragOverlay dropAnimation={{
