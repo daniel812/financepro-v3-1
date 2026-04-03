@@ -24,7 +24,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { motion, AnimatePresence } from 'motion/react';
 import { dbService } from '../lib/db';
 import { Task, TaskStatus } from '../types';
-import { Plus, Trash2, GripVertical, X, Check } from 'lucide-react';
+import { Plus, Trash2, GripVertical, X, Check, Calendar, Clock, AlignLeft } from 'lucide-react';
+import { format, isPast, isToday } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface NotesProps {
   month: string;
@@ -38,7 +40,7 @@ const COLUMNS: { id: TaskStatus; label: string; color: string }[] = [
   { id: 'DONE', label: 'Hecho', color: 'bg-emerald-500' },
 ];
 
-const SortableTaskCard = ({ task, onDelete }: { task: Task; onDelete: (id: string) => void }) => {
+const SortableTaskCard = ({ task, onDelete, onClick }: { task: Task; onDelete: (id: string) => void; onClick: (task: Task) => void }) => {
   const {
     attributes,
     listeners,
@@ -54,24 +56,41 @@ const SortableTaskCard = ({ task, onDelete }: { task: Task; onDelete: (id: strin
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const isOverdue = task.due_date && isPast(new Date(task.due_date)) && !isToday(new Date(task.due_date)) && task.status !== 'DONE';
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-3 group relative"
+      onClick={() => onClick(task)}
+      className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-3 group relative cursor-pointer hover:border-indigo-200 hover:shadow-md transition-all"
     >
       <div className="flex items-start gap-3">
-        <div {...attributes} {...listeners} className="mt-1 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition-colors">
+        <div 
+          {...attributes} 
+          {...listeners} 
+          onClick={(e) => e.stopPropagation()}
+          className="mt-1 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition-colors"
+        >
           <GripVertical size={18} />
         </div>
         <div className="flex-1 min-w-0">
           <h4 className="font-bold text-slate-800 text-sm mb-1 truncate">{task.title}</h4>
           {task.description && (
-            <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{task.description}</p>
+            <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-2">{task.description}</p>
+          )}
+          {task.due_date && (
+            <div className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider ${isOverdue ? 'text-rose-500' : 'text-slate-400'}`}>
+              <Calendar size={12} />
+              <span>{format(new Date(task.due_date), "d 'de' MMM", { locale: es })}</span>
+            </div>
           )}
         </div>
         <button 
-          onClick={() => onDelete(task.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(task.id);
+          }}
           className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
         >
           <Trash2 size={14} />
@@ -86,7 +105,8 @@ const Notes: React.FC<NotesProps> = ({ month, userId, familyAdminId }) => {
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState<TaskStatus | null>(null);
-  const [newTask, setNewTask] = useState({ title: '', description: '' });
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [newTask, setNewTask] = useState({ title: '', description: '', due_date: '' });
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -126,14 +146,30 @@ const Notes: React.FC<NotesProps> = ({ month, userId, familyAdminId }) => {
         status,
         month,
         position: maxPos + 1000,
+        due_date: newTask.due_date || null,
         user_id: userId,
         family_admin_id: familyAdminId
       });
       setTasks([...tasks, task]);
-      setNewTask({ title: '', description: '' });
+      setNewTask({ title: '', description: '', due_date: '' });
       setIsAdding(null);
     } catch (error) {
       console.error("Error creando tarea:", error);
+    }
+  };
+
+  const handleUpdateTaskDetails = async () => {
+    if (!editingTask) return;
+    try {
+      await dbService.updateTask(editingTask.id, {
+        title: editingTask.title,
+        description: editingTask.description,
+        due_date: editingTask.due_date
+      });
+      setTasks(tasks.map(t => t.id === editingTask.id ? editingTask : t));
+      setEditingTask(null);
+    } catch (error) {
+      console.error("Error actualizando tarea:", error);
     }
   };
 
@@ -142,6 +178,7 @@ const Notes: React.FC<NotesProps> = ({ month, userId, familyAdminId }) => {
     try {
       await dbService.deleteTask(id);
       setTasks(tasks.filter(t => t.id !== id));
+      if (editingTask?.id === id) setEditingTask(null);
     } catch (error) {
       console.error("Error eliminando tarea:", error);
     }
@@ -155,23 +192,34 @@ const Notes: React.FC<NotesProps> = ({ month, userId, familyAdminId }) => {
     const { active, over } = event;
     if (!over) return;
 
-    const activeTask = tasks.find(t => t.id === active.id);
+    const activeId = active.id as string;
     const overId = over.id as string;
 
-    // Find if we are over a column or a task
+    const activeTask = tasks.find(t => t.id === activeId);
+    if (!activeTask) return;
+
     const isOverAColumn = COLUMNS.some(c => c.id === overId);
     
-    if (activeTask) {
-      if (isOverAColumn) {
-        const overColumnId = overId as TaskStatus;
-        if (activeTask.status !== overColumnId) {
-          setTasks(prev => prev.map(t => t.id === active.id ? { ...t, status: overColumnId } : t));
-        }
-      } else {
-        const overTask = tasks.find(t => t.id === overId);
-        if (overTask && activeTask.status !== overTask.status) {
-          setTasks(prev => prev.map(t => t.id === active.id ? { ...t, status: overTask.status } : t));
-        }
+    if (isOverAColumn) {
+      const overColumnId = overId as TaskStatus;
+      if (activeTask.status !== overColumnId) {
+        setTasks(prev => {
+          const activeIndex = prev.findIndex(t => t.id === activeId);
+          const newTasks = [...prev];
+          newTasks[activeIndex] = { ...activeTask, status: overColumnId };
+          return newTasks;
+        });
+      }
+    } else {
+      const overTask = tasks.find(t => t.id === overId);
+      if (overTask && activeTask.status !== overTask.status) {
+        setTasks(prev => {
+          const activeIndex = prev.findIndex(t => t.id === activeId);
+          const overIndex = prev.findIndex(t => t.id === overId);
+          const newTasks = [...prev];
+          newTasks[activeIndex] = { ...activeTask, status: overTask.status };
+          return arrayMove(newTasks, activeIndex, overIndex);
+        });
       }
     }
   };
@@ -192,45 +240,36 @@ const Notes: React.FC<NotesProps> = ({ month, userId, familyAdminId }) => {
     const isOverAColumn = COLUMNS.some(c => c.id === overId);
 
     if (isOverAColumn) {
-      // Just moved to an empty column or same column
       const status = overId as TaskStatus;
       const columnTasks = newTasks.filter(t => t.status === status && t.id !== activeId);
       const maxPos = columnTasks.reduce((max, t) => Math.max(max, t.position), 0);
-      
       newTasks = newTasks.map(t => t.id === activeId ? { ...t, status, position: maxPos + 1000 } : t);
     } else {
-      const oldIndex = newTasks.findIndex(t => t.id === activeId);
-      const newIndex = newTasks.findIndex(t => t.id === overId);
-      
-      if (oldIndex !== newIndex) {
-        const overTask = newTasks[newIndex];
-        const status = overTask.status;
-        
-        // Move within or between columns
-        newTasks = arrayMove(newTasks, oldIndex, newIndex);
-        
-        // Update positions
-        const columnTasks = newTasks.filter(t => t.status === status);
-        const idxInColumn = columnTasks.findIndex(t => t.id === activeId);
-        
+      const overTask = newTasks.find(t => t.id === overId);
+      if (!overTask) return;
+
+      const status = overTask.status;
+      const columnTasks = newTasks.filter(t => t.status === status);
+      const activeIdx = columnTasks.findIndex(t => t.id === activeId);
+      const overIdx = columnTasks.findIndex(t => t.id === overId);
+
+      if (activeIdx !== overIdx) {
         let newPos;
-        if (columnTasks.length === 1) {
-          newPos = 1000;
-        } else if (idxInColumn === 0) {
-          newPos = columnTasks[1].position / 2;
-        } else if (idxInColumn === columnTasks.length - 1) {
-          newPos = columnTasks[idxInColumn - 1].position + 1000;
+        if (overIdx === 0) {
+          newPos = columnTasks[0].position / 2;
+        } else if (overIdx === columnTasks.length - 1) {
+          newPos = columnTasks[columnTasks.length - 1].position + 1000;
         } else {
-          newPos = (columnTasks[idxInColumn - 1].position + columnTasks[idxInColumn + 1].position) / 2;
+          const prevPos = columnTasks[overIdx - 1].position;
+          const nextPos = columnTasks[overIdx].position;
+          newPos = (prevPos + nextPos) / 2;
         }
-        
         newTasks = newTasks.map(t => t.id === activeId ? { ...t, status, position: newPos } : t);
       }
     }
 
     setTasks(newTasks);
     
-    // Persist change
     const updatedTask = newTasks.find(t => t.id === activeId);
     if (updatedTask) {
       try {
@@ -240,7 +279,7 @@ const Notes: React.FC<NotesProps> = ({ month, userId, familyAdminId }) => {
         });
       } catch (error) {
         console.error("Error persistiendo cambio de tarea:", error);
-        loadTasks(); // Rollback
+        loadTasks();
       }
     }
   };
@@ -315,12 +354,21 @@ const Notes: React.FC<NotesProps> = ({ month, userId, familyAdminId }) => {
                           />
                           <textarea
                             placeholder="Descripción (opcional)..."
-                            className="w-full text-xs text-slate-500 focus:outline-none resize-none placeholder:text-slate-300"
+                            className="w-full text-xs text-slate-500 focus:outline-none resize-none placeholder:text-slate-300 mb-3"
                             rows={2}
                             value={newTask.description}
                             onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
                           />
-                          <div className="flex justify-end gap-2 mt-3">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Calendar size={14} className="text-slate-400" />
+                            <input 
+                              type="date" 
+                              className="text-xs text-slate-500 focus:outline-none bg-slate-50 px-2 py-1 rounded-lg border border-slate-100"
+                              value={newTask.due_date}
+                              onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
                             <button 
                               onClick={() => setIsAdding(null)}
                               className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
@@ -345,6 +393,7 @@ const Notes: React.FC<NotesProps> = ({ month, userId, familyAdminId }) => {
                           key={task.id} 
                           task={task} 
                           onDelete={handleDeleteTask} 
+                          onClick={setEditingTask}
                         />
                       ))}
                     
@@ -371,7 +420,13 @@ const Notes: React.FC<NotesProps> = ({ month, userId, familyAdminId }) => {
                 <div className="bg-white p-4 rounded-2xl shadow-xl border border-indigo-100 w-[280px] cursor-grabbing rotate-2 scale-105 transition-transform">
                   <h4 className="font-bold text-slate-800 text-sm mb-1 truncate">{activeTask.title}</h4>
                   {activeTask.description && (
-                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{activeTask.description}</p>
+                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-2">{activeTask.description}</p>
+                  )}
+                  {activeTask.due_date && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <Calendar size={12} />
+                      <span>{format(new Date(activeTask.due_date), "d 'de' MMM", { locale: es })}</span>
+                    </div>
                   )}
                 </div>
               ) : null}
@@ -379,6 +434,111 @@ const Notes: React.FC<NotesProps> = ({ month, userId, familyAdminId }) => {
           </DndContext>
         </div>
       </div>
+
+      {/* Modal de Detalles */}
+      <AnimatePresence>
+        {editingTask && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setEditingTask(null)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-lg ${COLUMNS.find(c => c.id === editingTask.status)?.color}`}>
+                      <Check size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-800 leading-none">Detalles de Tarea</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">
+                        Estado: {COLUMNS.find(c => c.id === editingTask.status)?.label}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setEditingTask(null)}
+                    className="w-10 h-10 flex items-center justify-center text-slate-400 hover:bg-slate-50 rounded-xl transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Título</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                      value={editingTask.title}
+                      onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Descripción</label>
+                    <div className="relative">
+                      <textarea 
+                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all min-h-[120px]"
+                        value={editingTask.description || ''}
+                        onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                        placeholder="Añade más detalles..."
+                      />
+                      <AlignLeft size={16} className="absolute top-4 right-5 text-slate-300" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Fecha de Cumplimiento</label>
+                      <div className="relative">
+                        <input 
+                          type="date"
+                          className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-slate-800 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                          value={editingTask.due_date || ''}
+                          onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value })}
+                        />
+                        <Calendar size={16} className="absolute top-1/2 -translate-y-1/2 right-5 text-slate-300 pointer-events-none" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Creada el</label>
+                      <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-slate-400 font-medium text-sm flex items-center gap-3">
+                        <Clock size={16} />
+                        {format(new Date(editingTask.created_at), "d 'de' MMMM", { locale: es })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-10 flex gap-3">
+                  <button 
+                    onClick={() => handleDeleteTask(editingTask.id)}
+                    className="flex-1 py-4 text-rose-500 font-black uppercase tracking-widest text-xs hover:bg-rose-50 rounded-2xl transition-all"
+                  >
+                    Eliminar
+                  </button>
+                  <button 
+                    onClick={handleUpdateTaskDetails}
+                    className="flex-[2] bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                  >
+                    Guardar Cambios
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

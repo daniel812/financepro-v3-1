@@ -78,6 +78,7 @@ export interface Task {
   status: TaskStatus;
   month: string; // YYYY-MM-01
   position: number;
+  due_date: string | null;
   user_id: string;
   family_admin_id: string;
   created_at: string;
