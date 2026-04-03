@@ -150,12 +150,12 @@ const App: React.FC = () => {
 
   const navItems = [
     { path: '/', label: 'Panel', icon: 'fa-chart-pie', visible: true },
+    { path: '/reports', label: 'Informes', icon: 'fa-file-invoice-dollar', visible: true },
+    { path: '/income', label: 'Ingresos', icon: 'fa-wallet', visible: true },
     { path: '/expenses', label: 'Gastos', icon: 'fa-list-ul', visible: true },
+    { path: '/budgets', label: 'Presupuestos', icon: 'fa-bullseye', visible: isAdmin },
     { path: '/notes', label: 'Notas', icon: 'fa-clipboard-list', visible: true },
     { path: '/approvals', label: 'Aprobaciones', icon: 'fa-check-circle', visible: isAdmin },
-    { path: '/budgets', label: 'Presupuestos', icon: 'fa-bullseye', visible: isAdmin },
-    { path: '/income', label: 'Ingresos', icon: 'fa-wallet', visible: true },
-    { path: '/reports', label: 'Informes', icon: 'fa-file-invoice-dollar', visible: true },
     { path: '/settings', label: 'Ajustes', icon: 'fa-cog', visible: isAdmin },
   ];
 
