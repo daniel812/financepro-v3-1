@@ -1,0 +1,5 @@
+{
+  "name": "FinancePro - v3.0",
+  "description": "A high-performance personal finance management system replicating a complex Excel setup with category budgeting, payment method tracking, and income planning, integrated with Gemini AI for financial insights.",
+  "requestFramePermissions": []
+}
