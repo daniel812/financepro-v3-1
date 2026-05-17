@@ -108,6 +108,16 @@ export const dbService = {
     if (error) throw error;
   },
 
+  async addCategory(cat: Omit<Category, 'id'>) {
+    const client = ensureClient();
+    const { data, error } = await client
+      .from('categories')
+      .insert([cat])
+      .select();
+    if (error) throw error;
+    return data[0] as Category;
+  },
+
   // --- Métodos de Pago ---
   async getPaymentMethods(familyAdminId: string) {
     const client = ensureClient();
