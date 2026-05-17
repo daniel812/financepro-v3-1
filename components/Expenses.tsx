@@ -5,6 +5,7 @@ import { ExpenseTransaction, ExpenseStatus, Category, PaymentMethod, AppRole } f
 import { DayPicker, DateRange } from 'react-day-picker';
 import { format, isWithinInterval, parseISO, startOfMonth, endOfMonth, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
+import ExpenseModal from './ExpenseModal';
 
 interface ExpensesProps {
   month: string;
@@ -771,56 +772,18 @@ const Expenses: React.FC<ExpensesProps> = ({ month, role, userId, familyAdminId 
       )}
 
       {/* Modal / Bottom Sheet */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-lg shadow-2xl p-6 md:p-8 animate-in slide-in-from-bottom duration-300">
-            <h3 className="text-xl font-black mb-6 text-slate-800">
-              {editingId ? 'Editar Transacción' : (role === 'ADMIN' ? 'Registrar Gasto' : 'Enviar Gasto')}
-            </h3>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Fecha</label>
-                  <input type="date" required className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none" value={newExpense.date} onChange={e => setNewExpense({...newExpense, date: e.target.value})} />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Monto</label>
-                  <input type="number" required placeholder="0" className="w-full px-4 py-3 bg-slate-50 rounded-xl font-bold outline-none" value={newExpense.amount || ''} onChange={e => setNewExpense({...newExpense, amount: Number(e.target.value)})} />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Descripción</label>
-                <input type="text" required placeholder="¿En qué se gastó?" className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none" value={newExpense.description} onChange={e => setNewExpense({...newExpense, description: e.target.value})} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Categoría</label>
-                  <select required className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none" value={newExpense.category_id} onChange={e => setNewExpense({...newExpense, category_id: e.target.value})}>
-                    <option value="">Seleccionar Categoría</option>
-                    {categories.filter(c => c.is_active && c.parent_id).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Método</label>
-                  <select required className="w-full px-4 py-3 bg-slate-50 rounded-xl outline-none" value={newExpense.payment_method_id} onChange={e => setNewExpense({...newExpense, payment_method_id: e.target.value})}>
-                    <option value="">Seleccionar Método</option>
-                    {paymentMethods.filter(p => p.is_active).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              <button 
-                type="submit" 
-                disabled={submitting}
-                className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black uppercase tracking-wider shadow-lg disabled:opacity-50 transition-all active:scale-95"
-              >
-                {submitting ? <i className="fa-solid fa-spinner fa-spin mr-2"></i> : null}
-                {editingId ? 'Actualizar Transacción' : (role === 'ADMIN' ? 'Guardar Transacción' : 'Enviar para Aprobación')}
-              </button>
-              <button type="button" onClick={closeModal} className="w-full py-2 text-slate-400 font-bold uppercase text-[10px] tracking-widest">Descartar Entrada</button>
-            </form>
-          </div>
-        </div>
-      )}
+      <ExpenseModal 
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        onSave={handleSubmit}
+        editingId={editingId}
+        newExpense={newExpense}
+        setNewExpense={setNewExpense}
+        categories={categories}
+        paymentMethods={paymentMethods}
+        submitting={submitting}
+        role={role}
+      />
     </div>
   );
 };

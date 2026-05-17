@@ -235,7 +235,7 @@ const App: React.FC = () => {
             <Route path="/approvals" element={isAdmin ? <Approvals familyAdminId={familyAdminId} /> : <Navigate to="/" />} />
             <Route path="/budgets" element={isAdmin ? <Budgets month={selectedMonth} familyAdminId={familyAdminId} /> : <Navigate to="/" />} />
             <Route path="/income" element={<Income month={selectedMonth} familyAdminId={familyAdminId} />} />
-            <Route path="/reports" element={<Reports month={selectedMonth} role={profile.role} familyAdminId={familyAdminId} />} />
+            <Route path="/reports" element={<Reports month={selectedMonth} role={profile.role} userId={user.id} familyAdminId={familyAdminId} />} />
             <Route path="/settings" element={isAdmin ? <Settings profile={profile} /> : <Navigate to="/" />} />
           </Routes>
         </main>

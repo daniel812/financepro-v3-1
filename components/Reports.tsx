@@ -1,42 +1,92 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { dbService } from '../lib/db';
-import { Category, ExpenseTransaction, MonthlyCategoryBudget, AppRole } from '../types';
+import { Category, ExpenseTransaction, MonthlyCategoryBudget, AppRole, PaymentMethod, ExpenseStatus } from '../types';
+import ExpenseModal from './ExpenseModal';
 
 interface ReportsProps {
   month: string;
   role: AppRole;
+  userId: string;
   familyAdminId: string;
 }
 
-const Reports: React.FC<ReportsProps> = ({ month, role, familyAdminId }) => {
+const Reports: React.FC<ReportsProps> = ({ month, role, userId, familyAdminId }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [expenses, setExpenses] = useState<ExpenseTransaction[]>([]);
   const [budgets, setBudgets] = useState<MonthlyCategoryBudget[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 
+  const initialFormState: Partial<ExpenseTransaction> = {
+    date: new Date().toISOString().split('T')[0],
+    description: '',
+    amount: 0,
+    category_id: '',
+    payment_method_id: '',
+  };
+
+  const [newExpense, setNewExpense] = useState<Partial<ExpenseTransaction>>(initialFormState);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [cats, exps, buds, pms] = await Promise.all([
+        dbService.getCategories(familyAdminId),
+        dbService.getExpenses(month, familyAdminId),
+        dbService.getBudgets(month, familyAdminId),
+        dbService.getPaymentMethods(familyAdminId)
+      ]);
+      setCategories(cats);
+      setExpenses(exps);
+      setBudgets(buds);
+      setPaymentMethods(pms);
+      setExpandedParents(new Set(cats.filter(c => !c.parent_id).map(c => c.id)));
+    } catch (err) {
+      console.error("Error cargando datos del reporte:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const [cats, exps, buds] = await Promise.all([
-          dbService.getCategories(familyAdminId),
-          dbService.getExpenses(month, familyAdminId),
-          dbService.getBudgets(month, familyAdminId)
-        ]);
-        setCategories(cats);
-        setExpenses(exps);
-        setBudgets(buds);
-        setExpandedParents(new Set(cats.filter(c => !c.parent_id).map(c => c.id)));
-      } catch (err) {
-        console.error("Error cargando datos del reporte:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    loadData();
   }, [month, familyAdminId]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newExpense.description || !newExpense.amount || !newExpense.category_id || !newExpense.payment_method_id || !newExpense.date) {
+      alert("Por favor, completa todos los campos requeridos.");
+      return;
+    }
+    
+    setSubmitting(true);
+    try {
+      const initialStatus: ExpenseStatus = role === 'ADMIN' ? 'APPROVED' : 'PENDING_APPROVAL';
+      const payload = {
+        date: newExpense.date,
+        description: newExpense.description,
+        amount: Number(newExpense.amount),
+        category_id: newExpense.category_id,
+        payment_method_id: newExpense.payment_method_id,
+        status: initialStatus
+      };
+      await dbService.addExpense(payload as any, userId);
+      
+      setIsModalOpen(false);
+      setNewExpense(initialFormState);
+      await loadData();
+    } catch (err: any) {
+      console.error("Error guardando gasto:", err);
+      alert(`Error al guardar el gasto: ${err.message || "Error desconocido"}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const toggleParent = (id: string) => {
     const newSet = new Set(expandedParents);
@@ -94,9 +144,18 @@ const Reports: React.FC<ReportsProps> = ({ month, role, familyAdminId }) => {
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2 md:px-0">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Reporte de Rendimiento</h2>
-          <p className="text-slate-500 text-sm italic">Presupuesto Consolidado vs Gastos Reales</p>
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Reporte de Rendimiento</h2>
+            <p className="text-slate-500 text-sm italic">Presupuesto Consolidado vs Gastos Reales</p>
+          </div>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 w-fit"
+          >
+            <i className="fa-solid fa-plus"></i>
+            Crear Gasto
+          </button>
         </div>
         <div className="bg-white px-5 py-3 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between md:justify-start gap-4">
            <div>
@@ -188,6 +247,19 @@ const Reports: React.FC<ReportsProps> = ({ month, role, familyAdminId }) => {
           </div>
         ))}
       </div>
+
+      <ExpenseModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSubmit}
+        editingId={null}
+        newExpense={newExpense}
+        setNewExpense={setNewExpense}
+        categories={categories}
+        paymentMethods={paymentMethods}
+        submitting={submitting}
+        role={role}
+      />
     </div>
   );
 };
