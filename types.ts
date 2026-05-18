@@ -8,6 +8,7 @@ export interface Profile {
   role: AppRole;
   full_name?: string;
   family_admin_id?: string | null;
+  telegram_chat_id?: string | null;
 }
 
 export interface Category {

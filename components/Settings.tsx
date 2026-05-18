@@ -11,7 +11,7 @@ const Settings: React.FC<SettingsProps> = ({ profile }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [familyMembers, setFamilyMembers] = useState<Profile[]>([]);
-  const [activeTab, setActiveTab] = useState<'categories' | 'payments' | 'family'>('categories');
+  const [activeTab, setActiveTab] = useState<'categories' | 'payments' | 'family' | 'telegram'>('categories');
   const [loading, setLoading] = useState(true);
   
   const [isPMModalOpen, setIsPMModalOpen] = useState(false);
@@ -175,6 +175,12 @@ const Settings: React.FC<SettingsProps> = ({ profile }) => {
             >
               Miembros
             </button>
+            <button 
+              onClick={() => setActiveTab('telegram')} 
+              className={`px-6 md:px-8 py-4 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'telegram' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}
+            >
+              Telegram Bot
+            </button>
           </div>
           <div className="shrink-0 flex items-center gap-2 py-2">
             {activeTab === 'payments' && (
@@ -251,7 +257,7 @@ const Settings: React.FC<SettingsProps> = ({ profile }) => {
                 </div>
               ))}
             </div>
-          ) : (
+          ) : activeTab === 'family' ? (
             <div className="space-y-4">
               {familyMembers.map(member => (
                 <div key={member.id} className="p-5 bg-white border border-slate-100 rounded-2xl flex items-center justify-between group shadow-sm">
@@ -264,6 +270,58 @@ const Settings: React.FC<SettingsProps> = ({ profile }) => {
                    <button onClick={() => removeMember(member.id)} className="px-3 py-1 bg-rose-50 text-rose-500 rounded-lg text-[10px] font-black uppercase transition-all opacity-0 group-hover:opacity-100">Eliminar</button>
                 </div>
               ))}
+            </div>
+          ) : (
+            <div className="max-w-2xl mx-auto py-10 space-y-8 text-center">
+              <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <i className="fa-brands fa-telegram text-4xl"></i>
+              </div>
+              
+              <div>
+                <h3 className="text-2xl font-black text-slate-800 mb-2">Asistente de Telegram</h3>
+                <p className="text-slate-500 leading-relaxed">
+                  Registra gastos instantáneamente por chat usando inteligencia artificial. 
+                  El bot reconocerá el monto y la descripción, y te pedirá confirmar la categoría.
+                </p>
+              </div>
+
+              {profile.telegram_chat_id ? (
+                <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-[2rem]">
+                  <div className="flex items-center justify-center gap-3 text-emerald-600 font-black uppercase tracking-widest text-xs mb-2">
+                    <i className="fa-solid fa-circle-check"></i>
+                    <span>Cuenta Vinculada</span>
+                  </div>
+                  <p className="text-emerald-800 text-sm">
+                    Tu cuenta está conectada a Telegram. Puedes enviar mensajes como "Gasolina 50000" al bot para registrar gastos.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="bg-slate-50 border border-slate-100 p-8 rounded-[2.5rem]">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Pasos para vincular</p>
+                    <ol className="text-left space-y-4">
+                      <li className="flex gap-4 items-start">
+                        <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">1</span>
+                        <p className="text-sm text-slate-600">Busca a tu bot de FinancePro en Telegram.</p>
+                      </li>
+                      <li className="flex gap-4 items-start">
+                        <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">2</span>
+                        <p className="text-sm text-slate-600">Presiona 'Iniciar' o envía el siguiente código de vinculación:</p>
+                      </li>
+                    </ol>
+                    
+                    <div className="mt-6 p-4 bg-white border border-dashed border-indigo-200 rounded-2xl">
+                      <code className="text-lg font-black text-indigo-600 select-all tracking-wider">
+                        /start {profile.id}
+                      </code>
+                    </div>
+                  </div>
+                  
+                  <p className="text-[10px] text-slate-400 italic">
+                    *Nota: Asegúrate de que el administrador de la plataforma haya configurado el TELEGRAM_BOT_TOKEN en las variables de entorno.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
