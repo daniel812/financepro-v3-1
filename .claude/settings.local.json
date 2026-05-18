@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\user\\\\OneDrive\\\\Daniel\\\\FinancePro\\\\financepro---v3.0\" -Force)",
+      "Bash(Select-Object Name, Mode)",
+      "Bash(Format-Table)",
+      "Bash(cd \"/c/Users/user/OneDrive/Daniel/FinancePro/financepro---v3.0\" && find . -maxdepth 2 -type f -name \"*.json\" -o -name \"*.js\" -o -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.jsx\" | head -50)"
+    ]
+  }
+}
