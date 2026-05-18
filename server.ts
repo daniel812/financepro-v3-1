@@ -2,7 +2,7 @@
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialization
@@ -18,7 +18,7 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY || ''
 );
 
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY || '');
 
 // Helper to send messages to Telegram
 async function sendTelegramMessage(chatId: number, text: string, replyMarkup?: any) {
@@ -61,10 +61,27 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', botActive: !!BOT_TOKEN });
 });
 
+app.get('/api/telegram/status', async (req, res) => {
+  if (!BOT_TOKEN) return res.json({ error: 'TELEGRAM_BOT_TOKEN no configurado' });
+  
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getWebhookInfo`);
+    const info = await response.json();
+    res.json({
+      botTokenSet: true,
+      appUrl: process.env.APP_URL || 'No configurada (requerida para webhooks)',
+      webhookInfo: info.result
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'No se pudo contactar con Telegram', details: err });
+  }
+});
+
 // Telegram Webhook
 app.post('/api/telegram/webhook', async (req, res) => {
+  console.log("📩 Recibida actualización de Telegram");
   const { message, callback_query } = req.body;
-  res.sendStatus(200); // Always respond 200 first
+  res.sendStatus(200); 
 
   if (callback_query) {
     const chatId = callback_query.message.chat.id;
@@ -117,18 +134,13 @@ app.post('/api/telegram/webhook', async (req, res) => {
 
   // Parse expense with Gemini
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
-      contents: `Extrae el monto de dinero y la descripción de un gasto del siguiente texto en español: "${text}". 
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(`Extrae el monto de dinero y la descripción de un gasto del siguiente texto en español: "${text}". 
       Responde ÚNICAMENTE con un objeto JSON en este formato: {"amount": número, "description": "texto"}. 
-      Si no es un gasto, responde con {"error": "no_expense"}.`
-    });
+      Si no es un gasto, responde con {"error": "no_expense"}.`);
 
-    if (!response.text) {
-      throw new Error("No response from Gemini");
-    }
-
-    const responseText = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const response = result.response;
+    const responseText = response.text().replace(/```json/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(responseText);
 
     if (parsed.error) {

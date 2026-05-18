@@ -316,6 +316,23 @@ const Settings: React.FC<SettingsProps> = ({ profile }) => {
                       </code>
                     </div>
                   </div>
+
+                  <div className="pt-4">
+                    <button 
+                      onClick={async () => {
+                        try {
+                          const res = await fetch('/api/telegram/status');
+                          const data = await res.json();
+                          alert(JSON.stringify(data, null, 2));
+                        } catch (err) {
+                          alert('Error al conectar con el servidor de diagnóstico.');
+                        }
+                      }}
+                      className="text-xs font-bold text-indigo-600 hover:underline"
+                    >
+                      Verificar estado de conexión del Bot
+                    </button>
+                  </div>
                   
                   <p className="text-[10px] text-slate-400 italic">
                     *Nota: Asegúrate de que el administrador de la plataforma haya configurado el TELEGRAM_BOT_TOKEN en las variables de entorno.
