@@ -2,7 +2,11 @@ import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
+// Service role key bypasses RLS — safe here because this runs server-side only
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY!
+);
 const genAI = new GoogleGenerativeAI(process.env.API_KEY!);
 
 // ─── Telegram helpers ────────────────────────────────────────────────────────
