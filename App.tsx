@@ -26,7 +26,10 @@ const App: React.FC = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [initialLoadError, setInitialLoadError] = useState<string | null>(null);
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  // Detect recovery URL synchronously before any async auth runs
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(
+    () => window.location.hash.includes('type=recovery')
+  );
   const location = useLocation();
 
   useEffect(() => {
@@ -61,7 +64,10 @@ const App: React.FC = () => {
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (mounted) syncProfile(session?.user ?? null);
+      // Skip profile sync on recovery — onAuthStateChange handles it
+      if (mounted && !window.location.hash.includes('type=recovery')) {
+        syncProfile(session?.user ?? null);
+      }
     }).catch(err => {
       if (mounted) {
         setInitialLoadError("Error de comunicación con el servicio de autenticación.");
@@ -71,11 +77,17 @@ const App: React.FC = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        if (mounted) setIsPasswordRecovery(true);
-      } else {
-        if (mounted) setIsPasswordRecovery(false);
+        if (mounted) {
+          setIsPasswordRecovery(true);
+          setUser(session?.user ?? null);
+          setAuthLoading(false);
+        }
+        return;
       }
-      if (mounted) syncProfile(session?.user ?? null);
+      if (mounted) {
+        setIsPasswordRecovery(false);
+        syncProfile(session?.user ?? null);
+      }
     });
 
     return () => {
