@@ -139,9 +139,13 @@ async function handleExpenseText(chatId: number, text: string) {
     familyAdminId: adminId,
   });
 
-  const keyboard = {
-    inline_keyboard: categories.slice(0, 8).map((c) => [{ text: c.name, callback_data: `cat_${c.id}` }]),
-  };
+  const rows = [];
+  for (let i = 0; i < categories.length; i += 2) {
+    const row = [{ text: categories[i].name, callback_data: `cat_${categories[i].id}` }];
+    if (categories[i + 1]) row.push({ text: categories[i + 1].name, callback_data: `cat_${categories[i + 1].id}` });
+    rows.push(row);
+  }
+  const keyboard = { inline_keyboard: rows };
 
   await sendMessage(
     chatId,
