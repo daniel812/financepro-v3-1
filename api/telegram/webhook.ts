@@ -120,14 +120,31 @@ async function handleExpenseText(chatId: number, text: string) {
 
   const adminId = profile.family_admin_id || profile.id;
 
-  const { data: categories } = await supabase
+  const ALLOWED_CATEGORIES = [
+    'Ahorro Salidas 3%',
+    'Ahorro Salud 3%',
+    'Gasolina',
+    'Lavado Carro',
+    'Mercado',
+    'Pasajes',
+    'Plata Daniel',
+    'Plata Isa',
+    'Plata Julieth',
+    'Transporte Isa',
+  ];
+
+  const { data: allCategories } = await supabase
     .from('categories')
     .select('id, name')
     .eq('user_id', adminId)
     .eq('is_active', true)
-    .not('parent_id', 'is', null);
+    .in('name', ALLOWED_CATEGORIES);
 
-  if (!categories?.length) {
+  const categories = (allCategories || []).sort(
+    (a, b) => ALLOWED_CATEGORIES.indexOf(a.name) - ALLOWED_CATEGORIES.indexOf(b.name)
+  );
+
+  if (!categories.length) {
     await sendMessage(chatId, '⚠️ No hay categorías activas. Configúralas en Ajustes.');
     return;
   }
