@@ -87,7 +87,7 @@ async function handleExpenseText(chatId: number, text: string) {
     return;
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
   const result = await model.generateContent(
     `Extrae el monto de dinero y la descripción de un gasto del siguiente texto en español: "${text}". ` +
     `Responde ÚNICAMENTE con un objeto JSON: {"amount": número, "description": "texto"}. ` +
