@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 // Service role key bypasses RLS — safe here because this runs server-side only
@@ -7,7 +6,6 @@ const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY!
 );
-const genAI = new GoogleGenerativeAI(process.env.API_KEY!);
 
 // ─── Telegram helpers ────────────────────────────────────────────────────────
 
@@ -73,6 +71,32 @@ async function handleStart(chatId: number, linkToken?: string) {
   }
 }
 
+// ─── Expense parser (no AI) ──────────────────────────────────────────────────
+// Expects: "Descripción Monto" or "Monto Descripción"
+// Examples: "Leche 4200", "Gasolina 80.000", "50000 Mercado"
+
+function parseExpense(text: string): { amount: number; description: string } | null {
+  const tokens = text.trim().split(/\s+/);
+
+  // Find the last token that looks like a number (handles 4200, 80.000, 1.200.000)
+  let amountIndex = -1;
+  let amount = 0;
+
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const clean = tokens[i].replace(/[$,]/g, '');
+    if (/^\d{1,3}(\.\d{3})*$|^\d+$/.test(clean)) {
+      amount = parseInt(clean.replace(/\./g, ''), 10);
+      amountIndex = i;
+      break;
+    }
+  }
+
+  if (amountIndex === -1 || amount <= 0) return null;
+
+  const description = tokens.filter((_, i) => i !== amountIndex).join(' ').trim() || 'Gasto';
+  return { amount, description };
+}
+
 // ─── Expense text handler ────────────────────────────────────────────────────
 
 async function handleExpenseText(chatId: number, text: string) {
@@ -87,18 +111,10 @@ async function handleExpenseText(chatId: number, text: string) {
     return;
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-  const result = await model.generateContent(
-    `Extrae el monto de dinero y la descripción de un gasto del siguiente texto en español: "${text}". ` +
-    `Responde ÚNICAMENTE con un objeto JSON: {"amount": número, "description": "texto"}. ` +
-    `Si no es un gasto válido, responde: {"error": "no_expense"}.`
-  );
+  const parsed = parseExpense(text);
 
-  const raw = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-  const parsed = JSON.parse(raw);
-
-  if (parsed.error) {
-    await sendMessage(chatId, 'No entendí eso como un gasto. Prueba algo como:\n*Gasolina 50000* o *Almuerzo 12000*');
+  if (!parsed) {
+    await sendMessage(chatId, 'No entendí el gasto. Usa el formato:\n*Descripción Monto*\n\nEjemplos:\n• Leche 4200\n• Gasolina 80.000\n• Mercado 150000');
     return;
   }
 
