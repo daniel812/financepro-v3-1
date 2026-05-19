@@ -8,6 +8,7 @@ import Income from './components/Income';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
 import Login from './components/Login';
+import ChangePassword from './components/ChangePassword';
 import Approvals from './components/Approvals';
 import Notes from './components/Notes';
 import MonthSelector from './components/MonthSelector';
@@ -25,6 +26,7 @@ const App: React.FC = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [initialLoadError, setInitialLoadError] = useState<string | null>(null);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -68,6 +70,11 @@ const App: React.FC = () => {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        if (mounted) setIsPasswordRecovery(true);
+      } else {
+        if (mounted) setIsPasswordRecovery(false);
+      }
       if (mounted) syncProfile(session?.user ?? null);
     });
 
@@ -139,6 +146,10 @@ const App: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  if (isPasswordRecovery && user) {
+    return <ChangePassword onDone={() => setIsPasswordRecovery(false)} />;
   }
 
   if (!user || !profile) {
