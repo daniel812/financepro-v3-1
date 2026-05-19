@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
 import Expenses from './components/Expenses';
@@ -30,6 +30,7 @@ const App: React.FC = () => {
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(
     () => window.location.hash.includes('type=recovery')
   );
+  const recoveryInProgress = useRef(window.location.hash.includes('type=recovery'));
   const location = useLocation();
 
   useEffect(() => {
@@ -77,6 +78,7 @@ const App: React.FC = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
+        recoveryInProgress.current = true;
         if (mounted) {
           setIsPasswordRecovery(true);
           setUser(session?.user ?? null);
@@ -84,6 +86,13 @@ const App: React.FC = () => {
         }
         return;
       }
+
+      // SIGNED_IN fires right after PASSWORD_RECOVERY — ignore it during recovery
+      if (event === 'SIGNED_IN' && recoveryInProgress.current) {
+        return;
+      }
+
+      recoveryInProgress.current = false;
       if (mounted) {
         setIsPasswordRecovery(false);
         syncProfile(session?.user ?? null);
@@ -161,7 +170,10 @@ const App: React.FC = () => {
   }
 
   if (isPasswordRecovery && user) {
-    return <ChangePassword onDone={() => setIsPasswordRecovery(false)} />;
+    return <ChangePassword onDone={() => {
+      recoveryInProgress.current = false;
+      setIsPasswordRecovery(false);
+    }} />;
   }
 
   if (!user || !profile) {
