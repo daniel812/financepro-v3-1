@@ -235,9 +235,6 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({ ok: true });
   }
 
-  // Respond to Telegram immediately (required within 5s)
-  res.status(200).json({ ok: true });
-
   const { message, callback_query } = req.body || {};
 
   try {
@@ -257,4 +254,7 @@ export default async function handler(req: any, res: any) {
   } catch (err) {
     console.error('Bot error:', err);
   }
+
+  // Respond only after all processing is done — Vercel kills network calls after res.end()
+  return res.status(200).json({ ok: true });
 }
