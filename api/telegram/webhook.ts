@@ -228,7 +228,7 @@ async function handleCallback(chatId: number, callbackData: string) {
     const status = profile?.role === 'ADMIN' ? 'APPROVED' : 'PENDING_APPROVAL';
 
     const { error } = await supabase.from('expenses').insert([{
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' }),
       description: session.data.description,
       amount: session.data.amount,
       category_id: session.data.category_id,
