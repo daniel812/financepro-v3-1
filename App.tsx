@@ -191,7 +191,7 @@ const App: React.FC = () => {
     { path: '/budgets', label: 'Presupuestos', icon: 'fa-bullseye', visible: isAdmin },
     { path: '/notes', label: 'Notas', icon: 'fa-clipboard-list', visible: true },
     { path: '/approvals', label: 'Aprobaciones', icon: 'fa-check-circle', visible: isAdmin },
-    { path: '/settings', label: 'Ajustes', icon: 'fa-cog', visible: isAdmin },
+    { path: '/settings', label: 'Ajustes', icon: 'fa-cog', visible: true },
   ];
 
   const visibleNav = navItems.filter(i => i.visible);
@@ -271,7 +271,7 @@ const App: React.FC = () => {
             <Route path="/budgets" element={isAdmin ? <Budgets month={selectedMonth} familyAdminId={familyAdminId} /> : <Navigate to="/" />} />
             <Route path="/income" element={<Income month={selectedMonth} familyAdminId={familyAdminId} />} />
             <Route path="/reports" element={<Reports month={selectedMonth} role={profile.role} userId={user.id} familyAdminId={familyAdminId} />} />
-            <Route path="/settings" element={isAdmin ? <Settings profile={profile} /> : <Navigate to="/" />} />
+            <Route path="/settings" element={<Settings profile={profile} />} />
           </Routes>
         </main>
 

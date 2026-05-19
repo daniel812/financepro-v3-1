@@ -8,10 +8,13 @@ interface SettingsProps {
 }
 
 const Settings: React.FC<SettingsProps> = ({ profile }) => {
+  const isAdmin = profile.role === 'ADMIN';
   const [categories, setCategories] = useState<Category[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [familyMembers, setFamilyMembers] = useState<Profile[]>([]);
-  const [activeTab, setActiveTab] = useState<'categories' | 'payments' | 'family' | 'telegram'>('categories');
+  const [activeTab, setActiveTab] = useState<'categories' | 'payments' | 'family' | 'telegram'>(
+    isAdmin ? 'categories' : 'telegram'
+  );
   const [loading, setLoading] = useState(true);
   
   const [isPMModalOpen, setIsPMModalOpen] = useState(false);
@@ -144,39 +147,45 @@ const Settings: React.FC<SettingsProps> = ({ profile }) => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12">
-      <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-           <h2 className="text-xl font-bold text-slate-800">Infraestructura Familiar</h2>
-           <p className="text-sm text-slate-400">Configura tu ecosistema financiero compartido</p>
+      {isAdmin && (
+        <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">Infraestructura Familiar</h2>
+            <p className="text-sm text-slate-400">Configura tu ecosistema financiero compartido</p>
+          </div>
+          <button onClick={handleInitialize} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 transition-all active:scale-95 hover:bg-indigo-700">
+            Reiniciar Listado de Conceptos
+          </button>
         </div>
-        <button onClick={handleInitialize} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 transition-all active:scale-95 hover:bg-indigo-700">
-          Reiniciar Listado de Conceptos
-        </button>
-      </div>
+      )}
 
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden min-h-[400px]">
         <div className="flex border-b border-slate-100 items-center justify-between pr-6 overflow-x-auto">
           <div className="flex shrink-0">
-            <button 
-              onClick={() => setActiveTab('categories')} 
-              className={`px-6 md:px-8 py-4 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'categories' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}
-            >
-              Categorías
-            </button>
-            <button 
-              onClick={() => setActiveTab('payments')} 
-              className={`px-6 md:px-8 py-4 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'payments' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}
-            >
-              Pagos
-            </button>
-            <button 
-              onClick={() => setActiveTab('family')} 
-              className={`px-6 md:px-8 py-4 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'family' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}
-            >
-              Miembros
-            </button>
-            <button 
-              onClick={() => setActiveTab('telegram')} 
+            {isAdmin && (
+              <>
+                <button
+                  onClick={() => setActiveTab('categories')}
+                  className={`px-6 md:px-8 py-4 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'categories' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}
+                >
+                  Categorías
+                </button>
+                <button
+                  onClick={() => setActiveTab('payments')}
+                  className={`px-6 md:px-8 py-4 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'payments' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}
+                >
+                  Pagos
+                </button>
+                <button
+                  onClick={() => setActiveTab('family')}
+                  className={`px-6 md:px-8 py-4 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'family' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}
+                >
+                  Miembros
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => setActiveTab('telegram')}
               className={`px-6 md:px-8 py-4 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'telegram' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}
             >
               Telegram Bot
