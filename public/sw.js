@@ -1,12 +1,9 @@
 
-const CACHE_NAME = 'financepro-v1';
+const CACHE_NAME = 'financepro-v2';
 const ASSETS = [
   '/',
   '/index.html',
-  '/index.tsx',
-  '/manifest.json',
-  'https://cdn.tailwindcss.com',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+  '/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
