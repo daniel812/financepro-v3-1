@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import App from './App';
+import './index.css';
 
 // Register Service Worker for PWA (Android App experience)
 if ('serviceWorker' in navigator) {
