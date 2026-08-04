@@ -78,7 +78,9 @@ const Dashboard: React.FC<DashboardProps> = ({ month, role, familyAdminId }) => 
       return { name: p.name, value: total };
     }).filter(d => d.value > 0);
 
-    return { totalSpent, totalPlanned, totalIncomeExpected, totalIncomeReceived, paidExpenses, pendingExpenses, parentData, pmData };
+    const availableBalance = totalIncomeExpected - totalPlanned;
+
+    return { totalSpent, totalPlanned, totalIncomeExpected, totalIncomeReceived, paidExpenses, pendingExpenses, parentData, pmData, availableBalance };
   }, [data]);
 
   const currency = (val: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(val);
@@ -94,7 +96,7 @@ const Dashboard: React.FC<DashboardProps> = ({ month, role, familyAdminId }) => 
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-10">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <div className="bg-white p-5 md:p-6 rounded-3xl border border-slate-100 shadow-sm overflow-hidden relative group">
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full opacity-50 group-hover:scale-110 transition-transform"></div>
           <div className="relative z-10">
@@ -142,6 +144,23 @@ const Dashboard: React.FC<DashboardProps> = ({ month, role, familyAdminId }) => 
             <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Listos para pago</p>
             <div className="mt-5 flex gap-2">
               <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap border border-emerald-100">Pagado: {currency(report.paidExpenses)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 md:p-6 rounded-3xl border border-slate-100 shadow-sm overflow-hidden relative group">
+          <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full opacity-50 group-hover:scale-110 transition-transform ${report.availableBalance >= 0 ? 'bg-sky-50' : 'bg-rose-50'}`}></div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo Disponible</span>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${report.availableBalance >= 0 ? 'bg-sky-100 text-sky-600' : 'bg-rose-100 text-rose-600'}`}>
+                <i className="fa-solid fa-scale-balanced text-xs"></i>
+              </div>
+            </div>
+            <h3 className={`text-2xl font-black tracking-tight ${report.availableBalance >= 0 ? 'text-slate-800' : 'text-rose-600'}`}>{currency(report.availableBalance)}</h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Ingresos: {currency(report.totalIncomeExpected)}</p>
+            <div className="mt-5 h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className={`h-full transition-all duration-1000 ${report.availableBalance >= 0 ? 'bg-sky-500' : 'bg-rose-500'}`} style={{ width: `${Math.min(100, (report.totalPlanned / (report.totalIncomeExpected || 1)) * 100)}%` }}></div>
             </div>
           </div>
         </div>
