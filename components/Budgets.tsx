@@ -53,7 +53,6 @@ const Budgets: React.FC<BudgetsProps> = ({ month, familyAdminId }) => {
 
   const handleSave = async () => {
     const budgetsToSave = (Object.entries(editingBudgets) as [string, number][])
-      .filter(([_, amount]) => amount > 0) // Only save non-zero budgets to prevent cluttering future months if not needed
       .map(([catId, amount]) => ({
         category_id: catId,
         planned_amount: amount
@@ -95,21 +94,9 @@ const Budgets: React.FC<BudgetsProps> = ({ month, familyAdminId }) => {
 
   const groupedCategories = useMemo(() => {
     const parents = categories.filter(c => !c.parent_id);
-    const hasAnyBudgets = Object.values(editingBudgets).some(v => v > 0);
 
     return parents.map(p => {
-      let children = categories.filter(c => c.parent_id === p.id);
-      
-      // If we are in an older month, don't show categories that have 0 budget and didn't exist in the default list
-      // This is a heuristic to help "not damage" past months visually
-      if (hasAnyBudgets) {
-        children = children.filter(child => 
-          (editingBudgets[child.id] || 0) > 0 || 
-          DEFAULT_BUDGETS[child.name] !== undefined ||
-          addingToGroup === p.id // Show even if 0 if we just tried adding to it
-        );
-      }
-
+      const children = categories.filter(c => c.parent_id === p.id);
       const parentPlanned = children.reduce((sum, child) => sum + (editingBudgets[child.id] || 0), 0);
       return { ...p, children, totalPlanned: parentPlanned };
     }).filter(p => p.children.length > 0 || addingToGroup === p.id);
