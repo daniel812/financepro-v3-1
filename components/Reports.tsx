@@ -246,7 +246,12 @@ const Reports: React.FC<ReportsProps> = ({ month, role, userId, familyAdminId })
                       <div className="flex justify-between items-center md:col-span-1 mb-2 md:mb-0">
                         <div className="flex items-center gap-2">
                            <i className="fa-solid fa-turn-up rotate-90 text-slate-200 text-[10px]"></i>
-                           <span className="text-sm font-bold text-slate-700">{child.name}</span>
+                           <div>
+                             <span className="text-sm font-bold text-slate-700 block">{child.name}</span>
+                             <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wide">
+                               {(grandTotalPlanned > 0 ? (child.planned / grandTotalPlanned) * 100 : 0).toFixed(1)}% del presupuesto total
+                             </span>
+                           </div>
                         </div>
                         <span className="md:hidden text-[10px] font-black text-slate-400">{Math.round(child.percent)}%</span>
                       </div>
