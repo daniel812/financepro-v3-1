@@ -139,34 +139,69 @@ const Reports: React.FC<ReportsProps> = ({ month, role, userId, familyAdminId })
     );
   }
 
+  const grandTotalPlanned = reportData.reduce((s, p) => s + p.totalPlanned, 0);
+  const grandTotalSpent = reportData.reduce((s, p) => s + p.totalSpent, 0);
   const grandTotalRemaining = reportData.reduce((s, p) => s + p.totalRemaining, 0);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2 md:px-0">
-        <div className="flex flex-col md:flex-row md:items-center gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Reporte de Rendimiento</h2>
-            <p className="text-slate-500 text-sm italic">Presupuesto Consolidado vs Gastos Reales</p>
-          </div>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 w-fit"
-          >
-            <i className="fa-solid fa-plus"></i>
-            Crear Gasto
-          </button>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Reporte de Rendimiento</h2>
+          <p className="text-slate-500 text-sm italic">Presupuesto Consolidado vs Gastos Reales</p>
         </div>
-        <div className="bg-white px-5 py-3 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between md:justify-start gap-4">
-           <div>
-             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo Global Restante</p>
-             <p className={`text-xl font-black ${grandTotalRemaining >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-               {currency(grandTotalRemaining)}
-             </p>
-           </div>
-           <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${grandTotalRemaining >= 0 ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'}`}>
-              <i className={`fa-solid ${grandTotalRemaining >= 0 ? 'fa-face-smile' : 'fa-face-frown'}`}></i>
-           </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 w-fit"
+        >
+          <i className="fa-solid fa-plus"></i>
+          Crear Gasto
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
+        <div className="bg-white p-5 md:p-6 rounded-3xl border border-slate-100 shadow-sm overflow-hidden relative group">
+          <div className={`absolute -right-4 -top-4 w-24 h-24 rounded-full opacity-50 group-hover:scale-110 transition-transform ${grandTotalRemaining >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}`}></div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo Global Restante</span>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${grandTotalRemaining >= 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                <i className={`fa-solid ${grandTotalRemaining >= 0 ? 'fa-face-smile' : 'fa-face-frown'} text-xs`}></i>
+              </div>
+            </div>
+            <h3 className={`text-2xl font-black tracking-tight ${grandTotalRemaining >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{currency(grandTotalRemaining)}</h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Presupuesto - Gastado</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 md:p-6 rounded-3xl border border-slate-100 shadow-sm overflow-hidden relative group">
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-indigo-50 rounded-full opacity-50 group-hover:scale-110 transition-transform"></div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Presupuesto</span>
+              <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
+                <i className="fa-solid fa-clipboard-list text-xs"></i>
+              </div>
+            </div>
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight">{currency(grandTotalPlanned)}</h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Consolidado del mes</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 md:p-6 rounded-3xl border border-slate-100 shadow-sm overflow-hidden relative group">
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-orange-50 rounded-full opacity-50 group-hover:scale-110 transition-transform"></div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Gastado</span>
+              <div className="w-8 h-8 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center">
+                <i className="fa-solid fa-receipt text-xs"></i>
+              </div>
+            </div>
+            <h3 className="text-2xl font-black text-slate-800 tracking-tight">{currency(grandTotalSpent)}</h3>
+            <div className="mt-5 h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className={`h-full transition-all duration-1000 ${grandTotalSpent > grandTotalPlanned ? 'bg-rose-500' : 'bg-indigo-600'}`} style={{ width: `${Math.min(100, (grandTotalSpent / (grandTotalPlanned || 1)) * 100)}%` }}></div>
+            </div>
+          </div>
         </div>
       </div>
 
