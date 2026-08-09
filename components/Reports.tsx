@@ -1,8 +1,21 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { dbService } from '../lib/db';
 import { Category, ExpenseTransaction, MonthlyCategoryBudget, AppRole, PaymentMethod, ExpenseStatus } from '../types';
 import ExpenseModal from './ExpenseModal';
+
+const MONTH_NAMES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+
+const EXPENSE_STATUS_LABELS: Record<ExpenseStatus, string> = {
+  PENDING_APPROVAL: 'Pendiente de Aprobación',
+  APPROVED: 'Aprobado',
+  REJECTED: 'Rechazado',
+  PAID: 'Pagado',
+};
 
 interface ReportsProps {
   month: string;
@@ -130,6 +143,86 @@ const Reports: React.FC<ReportsProps> = ({ month, role, userId, familyAdminId })
     }).filter(p => p.children.length > 0 || p.totalPlanned > 0 || p.totalSpent > 0);
   }, [categories, expenses, budgets]);
 
+  const grandTotalPlanned = reportData.reduce((s, p) => s + p.totalPlanned, 0);
+  const grandTotalSpent = reportData.reduce((s, p) => s + p.totalSpent, 0);
+  const grandTotalRemaining = reportData.reduce((s, p) => s + p.totalRemaining, 0);
+
+  const handleExportExcel = () => {
+    try {
+      const summaryRows: Record<string, string | number>[] = [];
+
+      reportData.forEach(parent => {
+        summaryRows.push({
+          Grupo: parent.name,
+          Subcategoría: 'TOTAL GRUPO',
+          Presupuestado: parent.totalPlanned,
+          Gastado: parent.totalSpent,
+          Restante: parent.totalRemaining,
+          '% del Presupuesto Total': grandTotalPlanned > 0 ? Number(((parent.totalPlanned / grandTotalPlanned) * 100).toFixed(1)) : 0,
+          '% Ejecutado': Number(parent.totalPercent.toFixed(1)),
+        });
+        parent.children.forEach(child => {
+          summaryRows.push({
+            Grupo: parent.name,
+            Subcategoría: child.name,
+            Presupuestado: child.planned,
+            Gastado: child.spent,
+            Restante: child.remaining,
+            '% del Presupuesto Total': grandTotalPlanned > 0 ? Number(((child.planned / grandTotalPlanned) * 100).toFixed(1)) : 0,
+            '% Ejecutado': Number(child.percent.toFixed(1)),
+          });
+        });
+      });
+
+      summaryRows.push({
+        Grupo: 'TOTAL GENERAL',
+        Subcategoría: '',
+        Presupuestado: grandTotalPlanned,
+        Gastado: grandTotalSpent,
+        Restante: grandTotalRemaining,
+        '% del Presupuesto Total': 100,
+        '% Ejecutado': grandTotalPlanned > 0 ? Number(((grandTotalSpent / grandTotalPlanned) * 100).toFixed(1)) : 0,
+      });
+
+      const categoryMap = new Map(categories.map(c => [c.id, c]));
+      const paymentMethodMap = new Map(paymentMethods.map(p => [p.id, p.name]));
+
+      const detailRows = [...expenses]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map(e => {
+          const cat = categoryMap.get(e.category_id);
+          const parentCat = cat?.parent_id ? categoryMap.get(cat.parent_id) : null;
+          return {
+            Fecha: e.date,
+            Descripción: e.description,
+            Grupo: parentCat?.name || cat?.name || '—',
+            Categoría: cat?.name || '—',
+            'Medio de Pago': paymentMethodMap.get(e.payment_method_id) || '—',
+            Estado: EXPENSE_STATUS_LABELS[e.status] || e.status,
+            Monto: e.amount,
+            'Registrado por': e.profiles?.full_name || e.profiles?.email || '—',
+          };
+        });
+
+      const wb = XLSX.utils.book_new();
+
+      const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+      wsSummary['!cols'] = [{ wch: 22 }, { wch: 26 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 14 }];
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen');
+
+      const wsDetail = XLSX.utils.json_to_sheet(detailRows);
+      wsDetail['!cols'] = [{ wch: 12 }, { wch: 32 }, { wch: 18 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 14 }, { wch: 22 }];
+      XLSX.utils.book_append_sheet(wb, wsDetail, 'Gastos');
+
+      const monthDate = new Date(month + 'T00:00:00');
+      const fileName = `Informe_${MONTH_NAMES[monthDate.getMonth()]}_${monthDate.getFullYear()}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    } catch (err) {
+      console.error("Error exportando el informe a Excel:", err);
+      alert("No se pudo exportar el informe a Excel.");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 space-y-4">
@@ -139,10 +232,6 @@ const Reports: React.FC<ReportsProps> = ({ month, role, userId, familyAdminId })
     );
   }
 
-  const grandTotalPlanned = reportData.reduce((s, p) => s + p.totalPlanned, 0);
-  const grandTotalSpent = reportData.reduce((s, p) => s + p.totalSpent, 0);
-  const grandTotalRemaining = reportData.reduce((s, p) => s + p.totalRemaining, 0);
-
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2 md:px-0">
@@ -150,13 +239,22 @@ const Reports: React.FC<ReportsProps> = ({ month, role, userId, familyAdminId })
           <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Reporte de Rendimiento</h2>
           <p className="text-slate-500 text-sm italic">Presupuesto Consolidado vs Gastos Reales</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 w-fit"
-        >
-          <i className="fa-solid fa-plus"></i>
-          Crear Gasto
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 w-fit"
+          >
+            <i className="fa-solid fa-file-excel"></i>
+            Exportar a Excel
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 w-fit"
+          >
+            <i className="fa-solid fa-plus"></i>
+            Crear Gasto
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
