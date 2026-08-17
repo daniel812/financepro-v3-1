@@ -3,7 +3,22 @@ import React, { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { dbService } from '../lib/db';
 import { Category, ExpenseTransaction, MonthlyCategoryBudget, AppRole, PaymentMethod, ExpenseStatus } from '../types';
+import { getDueDateForMonth, getDueStatus, getBogotaToday, DueStatus } from '../lib/dueDate';
 import ExpenseModal from './ExpenseModal';
+
+const DUE_STATUS_LABELS: Record<DueStatus, string> = {
+  PAID: 'Pagado',
+  OVERDUE: 'Vencido',
+  DUE_SOON: 'Vence Pronto',
+  UPCOMING: 'Vence',
+};
+
+const DUE_STATUS_STYLES: Record<DueStatus, string> = {
+  PAID: 'bg-emerald-100 text-emerald-600',
+  OVERDUE: 'bg-rose-100 text-rose-600',
+  DUE_SOON: 'bg-amber-100 text-amber-600',
+  UPCOMING: 'bg-slate-100 text-slate-400',
+};
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -112,10 +127,11 @@ const Reports: React.FC<ReportsProps> = ({ month, role, userId, familyAdminId })
 
   const reportData = useMemo(() => {
     const parents = categories.filter(c => !c.parent_id);
-    
+    const today = getBogotaToday();
+
     return parents.map(parent => {
       const children = categories.filter(c => c.parent_id === parent.id);
-      
+
       const childrenReports = children.map(child => {
         const planned = budgets.find(b => b.category_id === child.id)?.planned_amount || 0;
         const spent = expenses
@@ -123,8 +139,10 @@ const Reports: React.FC<ReportsProps> = ({ month, role, userId, familyAdminId })
           .reduce((sum, e) => sum + e.amount, 0);
         const remaining = planned - spent;
         const percent = planned > 0 ? (spent / planned) * 100 : 0;
-        
-        return { ...child, planned, spent, remaining, percent };
+        const dueDate = child.due_day ? getDueDateForMonth(month, child.due_day) : null;
+        const dueStatus = getDueStatus(dueDate, planned > 0 && spent >= planned, today);
+
+        return { ...child, planned, spent, remaining, percent, dueDate, dueStatus };
       }).filter(c => c.planned > 0 || c.spent > 0);
 
       const totalPlanned = childrenReports.reduce((sum, c) => sum + c.planned, 0);
@@ -141,7 +159,7 @@ const Reports: React.FC<ReportsProps> = ({ month, role, userId, familyAdminId })
         totalPercent
       };
     }).filter(p => p.children.length > 0 || p.totalPlanned > 0 || p.totalSpent > 0);
-  }, [categories, expenses, budgets]);
+  }, [categories, expenses, budgets, month]);
 
   const grandTotalPlanned = reportData.reduce((s, p) => s + p.totalPlanned, 0);
   const grandTotalSpent = reportData.reduce((s, p) => s + p.totalSpent, 0);
@@ -160,6 +178,7 @@ const Reports: React.FC<ReportsProps> = ({ month, role, userId, familyAdminId })
           Restante: parent.totalRemaining,
           '% del Presupuesto Total': grandTotalPlanned > 0 ? Number(((parent.totalPlanned / grandTotalPlanned) * 100).toFixed(1)) : 0,
           '% Ejecutado': Number(parent.totalPercent.toFixed(1)),
+          Vencimiento: '',
         });
         parent.children.forEach(child => {
           summaryRows.push({
@@ -170,6 +189,7 @@ const Reports: React.FC<ReportsProps> = ({ month, role, userId, familyAdminId })
             Restante: child.remaining,
             '% del Presupuesto Total': grandTotalPlanned > 0 ? Number(((child.planned / grandTotalPlanned) * 100).toFixed(1)) : 0,
             '% Ejecutado': Number(child.percent.toFixed(1)),
+            Vencimiento: child.dueDate || '',
           });
         });
       });
@@ -182,6 +202,7 @@ const Reports: React.FC<ReportsProps> = ({ month, role, userId, familyAdminId })
         Restante: grandTotalRemaining,
         '% del Presupuesto Total': 100,
         '% Ejecutado': grandTotalPlanned > 0 ? Number(((grandTotalSpent / grandTotalPlanned) * 100).toFixed(1)) : 0,
+        Vencimiento: '',
       });
 
       const categoryMap = new Map(categories.map(c => [c.id, c]));
@@ -207,7 +228,7 @@ const Reports: React.FC<ReportsProps> = ({ month, role, userId, familyAdminId })
       const wb = XLSX.utils.book_new();
 
       const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
-      wsSummary['!cols'] = [{ wch: 22 }, { wch: 26 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 14 }];
+      wsSummary['!cols'] = [{ wch: 22 }, { wch: 26 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 14 }, { wch: 14 }];
       XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen');
 
       const wsDetail = XLSX.utils.json_to_sheet(detailRows);
@@ -345,7 +366,14 @@ const Reports: React.FC<ReportsProps> = ({ month, role, userId, familyAdminId })
                         <div className="flex items-center gap-2">
                            <i className="fa-solid fa-turn-up rotate-90 text-slate-200 text-[10px]"></i>
                            <div>
-                             <span className="text-sm font-bold text-slate-700 block">{child.name}</span>
+                             <div className="flex items-center gap-2">
+                               <span className="text-sm font-bold text-slate-700 block">{child.name}</span>
+                               {child.dueStatus && (
+                                 <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${DUE_STATUS_STYLES[child.dueStatus]}`}>
+                                   {child.dueStatus === 'PAID' || child.dueStatus === 'OVERDUE' ? DUE_STATUS_LABELS[child.dueStatus] : `${DUE_STATUS_LABELS[child.dueStatus]} el ${child.due_day}`}
+                                 </span>
+                               )}
+                             </div>
                              <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-wide">
                                {(grandTotalPlanned > 0 ? (child.planned / grandTotalPlanned) * 100 : 0).toFixed(1)}% del presupuesto total
                              </span>

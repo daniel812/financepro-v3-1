@@ -118,6 +118,15 @@ export const dbService = {
     return data[0] as Category;
   },
 
+  async updateCategory(id: string, patch: Partial<Pick<Category, 'name' | 'due_day' | 'default_amount'>>) {
+    const client = ensureClient();
+    const { error } = await client
+      .from('categories')
+      .update(patch)
+      .eq('id', id);
+    if (error) throw error;
+  },
+
   // --- Métodos de Pago ---
   async getPaymentMethods(familyAdminId: string) {
     const client = ensureClient();
