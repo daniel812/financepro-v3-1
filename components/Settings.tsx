@@ -19,7 +19,9 @@ const Settings: React.FC<SettingsProps> = ({ profile }) => {
   
   const [isPMModalOpen, setIsPMModalOpen] = useState(false);
   const [isFamilyModalOpen, setIsFamilyModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingPM, setEditingPM] = useState<Partial<PaymentMethod> | null>(null);
+  const [editingCategory, setEditingCategory] = useState<Partial<Category> | null>(null);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -72,6 +74,23 @@ const Settings: React.FC<SettingsProps> = ({ profile }) => {
       loadData();
     } catch (err) {
       alert("Error en actualización");
+    }
+  };
+
+  const handleCategorySave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCategory?.id) return;
+
+    try {
+      await dbService.updateCategory(editingCategory.id, {
+        default_amount: editingCategory.default_amount ?? null,
+        due_day: editingCategory.due_day ?? null
+      });
+      setIsCategoryModalOpen(false);
+      setEditingCategory(null);
+      loadData();
+    } catch (err: any) {
+      alert("Error al guardar: " + err.message);
     }
   };
 
@@ -235,13 +254,28 @@ const Settings: React.FC<SettingsProps> = ({ profile }) => {
                   <div className="p-2 space-y-1">
                     {parent.children.map(child => (
                       <div key={child.id} className="flex items-center justify-between px-4 py-2 hover:bg-white rounded-xl transition-colors group">
-                        <span className="text-sm font-medium text-slate-600">{child.name}</span>
-                        <button 
-                          onClick={() => toggleCategory(child.id, child.is_active)}
-                          className={`opacity-0 group-hover:opacity-100 transition-opacity text-[9px] font-black uppercase tracking-widest ${child.is_active ? 'text-rose-500' : 'text-emerald-500'}`}
-                        >
-                          {child.is_active ? 'Deshabilitar' : 'Habilitar'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-slate-600">{child.name}</span>
+                          {child.due_day && (
+                            <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-wide">
+                              Vence el {child.due_day}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => { setEditingCategory(child); setIsCategoryModalOpen(true); }}
+                            className="text-slate-400 hover:text-indigo-600 transition-colors"
+                          >
+                            <i className="fa-solid fa-pen-to-square"></i>
+                          </button>
+                          <button
+                            onClick={() => toggleCategory(child.id, child.is_active)}
+                            className={`text-[9px] font-black uppercase tracking-widest ${child.is_active ? 'text-rose-500' : 'text-emerald-500'}`}
+                          >
+                            {child.is_active ? 'Deshabilitar' : 'Habilitar'}
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -352,6 +386,68 @@ const Settings: React.FC<SettingsProps> = ({ profile }) => {
           )}
         </div>
       </div>
+
+      {/* Modal Categoría */}
+      {isCategoryModalOpen && editingCategory && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-8">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">{editingCategory.name}</h3>
+                <button onClick={() => { setIsCategoryModalOpen(false); setEditingCategory(null); }} className="text-slate-400 hover:text-slate-600 transition-colors">
+                  <i className="fa-solid fa-xmark text-xl"></i>
+                </button>
+              </div>
+
+              <form onSubmit={handleCategorySave} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Monto por Defecto</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editingCategory.default_amount ?? ''}
+                    onChange={e => setEditingCategory({ ...editingCategory, default_amount: e.target.value === '' ? null : Number(e.target.value) })}
+                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                    placeholder="Ej: 250000"
+                  />
+                  <p className="text-[10px] text-slate-400 ml-1">Se usa para prellenar el presupuesto de un mes que aún no tiene valores guardados.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Día de Vencimiento</label>
+                  <select
+                    value={editingCategory.due_day ?? ''}
+                    onChange={e => setEditingCategory({ ...editingCategory, due_day: e.target.value === '' ? null : Number(e.target.value) })}
+                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all appearance-none"
+                  >
+                    <option value="">Sin fecha de vencimiento</option>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                      <option key={day} value={day}>Día {day}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 ml-1">Aplica a todos los meses automáticamente.</p>
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setIsCategoryModalOpen(false); setEditingCategory(null); }}
+                    className="flex-1 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-400 hover:bg-slate-50 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95"
+                  >
+                    Guardar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Método de Pago */}
       {isPMModalOpen && (

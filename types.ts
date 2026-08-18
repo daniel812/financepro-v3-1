@@ -18,6 +18,8 @@ export interface Category {
   parent_id: string | null;
   is_active: boolean;
   user_id: string;
+  due_day: number | null; // day of month (1-31) this category's payment is due, if recurring
+  default_amount: number | null; // default planned_amount used to prefill a month with no saved budget
 }
 
 export interface PaymentMethod {

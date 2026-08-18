@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { dbService } from '../lib/db';
 import { Category } from '../types';
-import { DEFAULT_BUDGETS } from '../constants/budgets';
 
 interface BudgetsProps {
   month: string;
@@ -26,18 +25,10 @@ const Budgets: React.FC<BudgetsProps> = ({ month, familyAdminId }) => {
       setCategories(cats);
       
       const budgetMap: Record<string, number> = {};
-      const isPostFeb2026 = month > '2026-02-01';
-      const hasNoBudgets = buds.length === 0;
 
       cats.forEach(cat => {
         const budget = buds.find(b => b.category_id === cat.id);
-        if (budget) {
-          budgetMap[cat.id] = budget.planned_amount;
-        } else if (isPostFeb2026 && hasNoBudgets) {
-          budgetMap[cat.id] = DEFAULT_BUDGETS[cat.name] || 0;
-        } else {
-          budgetMap[cat.id] = 0;
-        }
+        budgetMap[cat.id] = budget ? budget.planned_amount : (cat.default_amount ?? 0);
       });
       setEditingBudgets(budgetMap);
     } catch (err) {
@@ -77,7 +68,9 @@ const Budgets: React.FC<BudgetsProps> = ({ month, familyAdminId }) => {
         parent_id: parentId,
         group_name: null,
         is_active: true,
-        user_id: familyAdminId
+        user_id: familyAdminId,
+        due_day: null,
+        default_amount: null
       });
       
       setCategories([...categories, newCat]);
@@ -140,7 +133,18 @@ const Budgets: React.FC<BudgetsProps> = ({ month, familyAdminId }) => {
             <div className="divide-y divide-slate-50/50">
               {group.children.map(child => (
                 <div key={child.id} className="p-4 pl-10 md:pl-14 flex items-center justify-between hover:bg-slate-50/30 transition-colors">
-                  <span className="font-bold text-slate-600 text-sm">{child.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-600 text-sm">{child.name}</span>
+                    {child.due_day && (
+                      <span
+                        title="Cambiar en Ajustes > Categorías"
+                        className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase tracking-wide"
+                      >
+                        <i className="fa-solid fa-calendar-day mr-1"></i>
+                        Vence el {child.due_day}
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 font-bold text-xs">$</span>
                     <input 
