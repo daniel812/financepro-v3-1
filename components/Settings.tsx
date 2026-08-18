@@ -24,6 +24,7 @@ const Settings: React.FC<SettingsProps> = ({ profile }) => {
   const [editingCategory, setEditingCategory] = useState<Partial<Category> | null>(null);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [testingReminders, setTestingReminders] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -143,6 +144,29 @@ const Settings: React.FC<SettingsProps> = ({ profile }) => {
       loadData();
     } catch (err: any) {
       alert('Error al eliminar miembro');
+    }
+  };
+
+  const handleTestReminders = async () => {
+    setTestingReminders(true);
+    try {
+      const res = await fetch('/api/cron/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: profile.id })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(`Error: ${data.error || 'No se pudo probar los recordatorios.'}`);
+      } else if (data.skipped) {
+        alert(`Omitido: ${data.skipped}`);
+      } else {
+        alert(`Categorías revisadas: ${data.checked}\nRecordatorios enviados: ${data.sent}${data.sent === 0 ? '\n\n(Configura un "Día de Vencimiento" en al menos una categoría para recibir un mensaje de prueba.)' : ''}`);
+      }
+    } catch (err) {
+      alert('Error al conectar con el servidor.');
+    } finally {
+      setTestingReminders(false);
     }
   };
 
@@ -337,6 +361,20 @@ const Settings: React.FC<SettingsProps> = ({ profile }) => {
                   <p className="text-emerald-800 text-sm">
                     Tu cuenta está conectada a Telegram. Puedes enviar mensajes como "Gasolina 50000" al bot para registrar gastos.
                   </p>
+                  {isAdmin && (
+                    <div className="pt-5 mt-5 border-t border-emerald-100">
+                      <button
+                        onClick={handleTestReminders}
+                        disabled={testingReminders}
+                        className="text-xs font-bold text-emerald-700 hover:underline disabled:opacity-50"
+                      >
+                        {testingReminders ? 'Enviando...' : 'Probar Recordatorios de Pago'}
+                      </button>
+                      <p className="text-[10px] text-emerald-700/70 mt-1">
+                        Envía por Telegram un recordatorio de prueba para cada categoría con fecha de vencimiento configurada, sin importar cuántos días falten.
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-6">
