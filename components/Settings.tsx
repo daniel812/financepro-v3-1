@@ -262,7 +262,7 @@ const Settings: React.FC<SettingsProps> = ({ profile }) => {
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-3">
                           <button
                             onClick={() => { setEditingCategory(child); setIsCategoryModalOpen(true); }}
                             className="text-slate-400 hover:text-indigo-600 transition-colors"
